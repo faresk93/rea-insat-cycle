@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moyennes Cycle et Rangs</title>
+<meta name="description" content="INSAT CH2 2014–2015 : moyennes CBA, CH2 et cycle ingénieur en 3D.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #05060d;
+  --glass: rgba(14, 16, 32, 0.62);
+  --glass-border: rgba(167, 139, 250, 0.22);
+  --text: #e8e9f3;
+  --muted: #8b8fa8;
+  --cyan: #22d3ee;
+  --violet: #a78bfa;
+  --pink: #f472b6;
+  --amber: #fbbf24;
+  --gold: #fde047;
+  --green: #4ade80;
+  --red: #f87171;
+  --title: linear-gradient(90deg, var(--cyan), var(--violet), var(--pink), var(--amber));
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+  font-family: "Space Grotesk", system-ui, sans-serif; }
+#scene { position: fixed; inset: 0; }
+#labels { position: fixed; inset: 0; pointer-events: none; }
+button, input { font: inherit; color: inherit; }
+
+.grad { background: var(--title); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+.glass { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 18px;
+  backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45); }
+
+/* Intro ------------------------------------------------------------------ */
+#intro { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; text-align: center;
+  background: radial-gradient(ellipse at center, rgba(20, 14, 44, 0.85), rgba(5, 6, 13, 0.97));
+  transition: opacity 1.1s ease, visibility 1.1s; padding: 24px; }
+#intro.hidden { opacity: 0; visibility: hidden; }
+#intro .bismillah { color: var(--amber); font-style: italic; opacity: 0; animation: fade 1.4s 0.2s forwards;
+  line-height: 1.6; font-size: clamp(14px, 2.2vw, 18px); }
+#intro .school { margin-top: 38px; letter-spacing: 0.5em; color: var(--muted); font-size: 13px;
+  opacity: 0; animation: fade 1s 1.1s forwards; }
+#intro h1 { margin: 14px 0 6px; font-size: clamp(30px, 6.4vw, 72px); font-weight: 700; letter-spacing: 0.04em;
+  line-height: 1.05; opacity: 0; animation: rise 1.2s 1.4s cubic-bezier(.2, .8, .2, 1) forwards;
+  background-size: 200% auto; }
+#intro h1.grad { animation: rise 1.2s 1.4s cubic-bezier(.2, .8, .2, 1) forwards, shimmer 6s linear infinite; }
+#intro .year { font-family: "JetBrains Mono", monospace; font-size: clamp(18px, 3vw, 28px); letter-spacing: 0.3em;
+  color: var(--violet); opacity: 0; animation: fade 1s 2s forwards; }
+#intro .by { margin-top: 10px; color: var(--muted); font-style: italic; opacity: 0; animation: fade 1s 2.3s forwards; }
+#enter { margin-top: 40px; padding: 14px 34px; border-radius: 999px; border: 1px solid rgba(167, 139, 250, 0.5);
+  background: rgba(167, 139, 250, 0.12); cursor: pointer; letter-spacing: 0.2em; font-size: 13px;
+  opacity: 0; animation: fade 1s 2.6s forwards; transition: background .25s, box-shadow .25s, transform .25s; }
+#enter:hover, #enter:focus-visible { background: rgba(167, 139, 250, 0.28); box-shadow: 0 0 30px rgba(167, 139, 250, 0.45);
+  transform: translateY(-1px); outline: none; }
+@keyframes fade { to { opacity: 1; } }
+@keyframes rise { from { opacity: 0; transform: translateY(18px); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes shimmer { to { background-position: 200% center; } }
+
+/* HUD -------------------------------------------------------------------- */
+#brand { position: fixed; top: 20px; left: 22px; z-index: 5; pointer-events: none; }
+#brand .t { font-weight: 700; font-size: 18px; letter-spacing: 0.03em; }
+#brand .s { color: var(--muted); font-size: 12px; letter-spacing: 0.25em; margin-top: 3px; }
+
+#search { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 6; width: min(420px, calc(100vw - 32px)); }
+#search input { width: 100%; padding: 12px 16px 12px 42px; border-radius: 14px; outline: none;
+  background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px); transition: border-color .2s, box-shadow .2s; }
+#search input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2); }
+#search input::placeholder { color: var(--muted); }
+#search .icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+#results { margin-top: 6px; padding: 6px; display: none; max-height: 50vh; overflow: auto; }
+#results.open { display: block; }
+#results button { display: flex; gap: 12px; width: 100%; text-align: left; padding: 9px 10px; border: 0;
+  border-radius: 10px; background: none; cursor: pointer; align-items: baseline; }
+#results button:hover, #results button.active { background: rgba(167, 139, 250, 0.16); }
+#results .n { font-family: "JetBrains Mono", monospace; color: var(--cyan); width: 2.4em; text-align: right; }
+#results .avg { margin-left: auto; color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 13px; }
+#results .none { padding: 10px; color: var(--muted); }
+
+#legend { position: fixed; left: 20px; bottom: 20px; z-index: 5; padding: 14px 16px; font-size: 13px; }
+#legend .row { display: flex; align-items: center; gap: 10px; margin: 5px 0; }
+#legend .dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 10px currentColor; background: currentColor; }
+#legend .axes { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); color: var(--muted);
+  font-size: 12px; line-height: 1.6; }
+#legend .axes b { color: var(--text); font-weight: 500; }
+
+#hint { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 4; color: var(--muted);
+  font-size: 12px; letter-spacing: 0.06em; pointer-events: none; text-align: center; white-space: nowrap; }
+kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 6px; border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.05); }
+
+/* Labels in 3D ----------------------------------------------------------- */
+.axis-label { font-family: "JetBrains Mono", monospace; font-size: 11px; color: rgba(200, 205, 230, 0.45); }
+.axis-title { font-size: 13px; font-weight: 700; letter-spacing: 0.2em; }
+.plane-label { font-size: 11px; letter-spacing: 0.18em; color: var(--green); text-shadow: 0 0 12px rgba(74, 222, 128, 0.6);
+  white-space: nowrap; }
+.tip { padding: 7px 11px; border-radius: 10px; background: rgba(10, 12, 26, 0.85); border: 1px solid var(--glass-border);
+  font-size: 13px; white-space: nowrap; transform: translateY(-30px); opacity: 0; transition: opacity .15s; }
+.tip.show { opacity: 1; }
+.tip .n { color: var(--cyan); font-family: "JetBrains Mono", monospace; margin-right: 6px; }
+.tip .v { color: var(--muted); font-family: "JetBrains Mono", monospace; margin-left: 8px; }
+
+/* Panel ------------------------------------------------------------------ */
+#panel { position: fixed; top: 16px; right: 16px; bottom: 16px; width: min(440px, calc(100vw - 32px)); z-index: 8;
+  padding: 22px 22px 18px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(167, 139, 250, 0.35) transparent; transform: translateX(calc(100% + 40px)); opacity: 0;
+  transition: transform .6s cubic-bezier(.2, .8, .2, 1), opacity .4s; }
+#panel.open { transform: none; opacity: 1; }
+#panel .top { display: flex; align-items: center; justify-content: space-between; }
+#panel .num { font-family: "JetBrains Mono", monospace; color: var(--muted); font-size: 13px; letter-spacing: 0.12em; }
+.icon-btn { border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); border-radius: 10px;
+  width: 34px; height: 34px; cursor: pointer; display: grid; place-items: center; transition: background .2s; }
+.icon-btn:hover { background: rgba(255, 255, 255, 0.12); }
+#panel .nav { display: flex; gap: 6px; }
+#panel h2 { margin: 10px 0 2px; font-size: 30px; line-height: 1.1; letter-spacing: 0.02em; background-size: 200% auto;
+  animation: shimmer 8s linear infinite; }
+#panel .sub { color: var(--muted); font-size: 13px; letter-spacing: 0.12em; }
+
+.card { margin-top: 14px; padding: 14px 16px; border-radius: 14px; background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07); position: relative; overflow: hidden;
+  opacity: 0; transform: translateY(10px); animation: card-in .6s forwards; }
+.card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--accent); box-shadow: 0 0 14px var(--accent); }
+@keyframes card-in { to { opacity: 1; transform: none; } }
+.card .head { display: flex; justify-content: space-between; align-items: center; }
+.card .label { font-size: 12px; letter-spacing: 0.22em; color: var(--accent); font-weight: 700; }
+.chip { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 3px 9px; border-radius: 999px; color: #0b0b14;
+  background: var(--accent); opacity: 0; transition: opacity .4s; }
+.chip.show { opacity: 1; }
+.card .row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 6px; }
+.card .value { font-family: "JetBrains Mono", monospace; font-size: 40px; font-weight: 600; letter-spacing: -0.02em;
+  text-shadow: 0 0 24px color-mix(in srgb, var(--accent) 55%, transparent); }
+.card .rank { font-family: "JetBrains Mono", monospace; color: var(--muted); font-size: 14px; }
+.card .rank b { color: var(--text); font-size: 20px; }
+.hist { display: flex; align-items: flex-end; gap: 2px; height: 34px; margin-top: 10px; }
+.hist i { flex: 1; height: 100%; background: var(--accent); opacity: 0.22; border-radius: 2px 2px 0 0; min-height: 2px;
+  transform-origin: bottom; transform: scaleY(0); transition: transform .7s cubic-bezier(.2, .8, .2, 1), opacity .4s; }
+.hist i.me { opacity: 1; box-shadow: 0 0 12px var(--accent); }
+.scale { display: flex; justify-content: space-between; font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--muted); margin-top: 3px; }
+.card .sentence { margin-top: 8px; font-size: 13px; color: #c4c7da; }
+
+#verdict { margin-top: 16px; padding: 18px; border-radius: 16px; text-align: center; min-height: 112px;
+  display: grid; place-items: center; border: 1px solid rgba(255, 255, 255, 0.08); position: relative; overflow: hidden; }
+#verdict .wait { color: var(--muted); font-style: italic; }
+#verdict .wait span { animation: blink 1.2s infinite; }
+#verdict .wait span:nth-child(2) { animation-delay: .2s; }
+#verdict .wait span:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 50% { opacity: 0.2; } }
+#verdict .big { font-size: 21px; font-weight: 700; letter-spacing: 0.16em; white-space: nowrap; animation: rise .8s forwards; }
+#verdict .msg { margin-top: 8px; font-size: 14px; color: #d5d7e6; }
+#verdict .msg2 { margin-top: 4px; font-size: 13px; color: var(--muted); }
+#verdict.pass { border-color: rgba(74, 222, 128, 0.45); box-shadow: inset 0 0 40px rgba(74, 222, 128, 0.12), 0 0 30px rgba(74, 222, 128, 0.15); }
+#verdict.major { border-color: rgba(253, 224, 71, 0.55); box-shadow: inset 0 0 40px rgba(253, 224, 71, 0.14), 0 0 34px rgba(251, 191, 36, 0.22); }
+#verdict.fail { border-color: rgba(248, 113, 113, 0.45); box-shadow: inset 0 0 40px rgba(248, 113, 113, 0.1); }
+.g-pass { background: linear-gradient(90deg, #22c55e, #a3e635, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.g-major { background: linear-gradient(90deg, #fde047, #f59e0b, #fde047); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.g-fail { background: linear-gradient(90deg, #ef4444, #f97316); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.g-soft { background: linear-gradient(90deg, #93c5fd, #c4b5fd); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+#credit { position: fixed; right: 22px; bottom: 18px; z-index: 4; color: var(--muted); font-size: 12px; pointer-events: none; }
+
+@media (max-width: 820px) {
+  #brand, #legend .axes, #hint, #credit { display: none; }
+  #search { top: 12px; }
+  #legend { left: 12px; bottom: 12px; padding: 10px 12px; font-size: 12px; }
+  #panel { top: auto; left: 12px; right: 12px; bottom: 12px; width: auto; max-height: 64vh;
+    transform: translateY(calc(100% + 30px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="scene"></div>
+<div id="labels"></div>
+
+<section id="intro">
+  <div>
+    <div class="bismillah">Au nom d'ALLAH<br>le Tout Miséricordieux, le Très Miséricordieux</div>
+    <div class="school">I.N.S.A.T · CH2</div>
+    <h1 class="grad">Moyennes Cycle<br>&amp; Rangs</h1>
+    <div class="year">2014 — 2015</div>
+    <div class="by">par Fares Khiary</div>
+    <button id="enter">ENTRER</button>
+  </div>
+</section>
+
+<header id="brand">
+  <div class="t grad">Moyennes Cycle &amp; Rangs</div>
+  <div class="s">INSAT · CH2 · 2014–2015</div>
+</header>
+
+<div id="search">
+  <span class="icon">⌕</span>
+  <input id="q" type="text" placeholder="Numéro ou nom…  (/)" autocomplete="off" spellcheck="false" aria-label="Rechercher un étudiant">
+  <div id="results" class="glass" role="listbox"></div>
+</div>
+
+<aside id="legend" class="glass">
+  <div class="row"><span class="dot" style="color: var(--gold)"></span>Major de promo</div>
+  <div class="row"><span class="dot" style="color: var(--cyan)"></span>Passage garanti · top 52</div>
+  <div class="row"><span class="dot" style="color: var(--red)"></span>Hors top 52</div>
+  <div class="axes"><b>X</b> Moyenne CBA &nbsp;·&nbsp; <b>Z</b> Moyenne CH2<br><b>Y</b> Moyenne cycle ingénieur</div>
+</aside>
+
+<div id="hint">Glisser pour tourner · molette pour zoomer · clic sur une étoile · <kbd>←</kbd> <kbd>→</kbd> parcourir · <kbd>Échap</kbd> fermer</div>
+<div id="credit">Programme par Fares Khiary · Peace ✌</div>
+
+<aside id="panel" class="glass" aria-live="polite"></aside>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { CSS2DRenderer, CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
+
+// ---------------------------------------------------------------------------
+// Data (same table and rules as cycle.py)
+// ---------------------------------------------------------------------------
+
+// [nom, prenom, Moyenne CBA, Moyenne CH2], in student-number order
+const STUDENTS = [
+  ["Abidi", "Mohamed", 12.06, 11.11],  // 1
+  ["Achour", "Nadya", 12.82, 12.01],  // 2
+  ["Aidoudi", "Meriem", 12.19, 12.29],  // 3
+  ["Ajlani", "Mahdi", 11.88, 10.36],  // 4
+  ["Athamna", "Jawaher", 12.06, 12.98],  // 5
+  ["Ayadi", "Nouha", 12.30, 10.90],  // 6
+  ["Baccar", "Nada", 12.79, 12.56],  // 7
+  ["Baccouche", "Oumayma", 12.16, 11.63],  // 8
+  ["Baccouche", "Hala", 12.22, 11.70],  // 9
+  ["Baraket", "Nada", 12.90, 11.09],  // 10
+  ["Barguellil", "Sana", 11.29, 11.16],  // 11
+  ["Bargui", "Emna", 10.60, 11.14],  // 12
+  ["Barraj", "Souad", 12.32, 12.08],  // 13
+  ["Bel Skander", "Sabrine", 12.25, 10.31],  // 14
+  ["Ben Abdessamad", "Montassar", 11.34, 10.56],  // 15
+  ["Ben Ali", "Rafeh", 12.22, 11.11],  // 16
+  ["Ben Bouzayen", "Abir", 13.34, 12.12],  // 17
+  ["Ben Osman", "Yasmine", 11.91, 11.66],  // 18
+  ["Ben Wannes", "Chayma", 11.75, 10.59],  // 19
+  ["Borgini", "Ahmed", 12.60, 11.79],  // 20
+  ["Bouaziz", "Nouha", 12.14, 10.76],  // 21
+  ["Boubaker", "Samar", 11.88, 10.37],  // 22
+  ["Brahmi", "Chayma", 13.71, 11.66],  // 23
+  ["Brouri", "Rania", 10.78, 10.74],  // 24
+  ["Bzainia", "Amir", 11.98, 10.30],  // 25
+  ["Chaouch", "Feriel", 12.32, 11.56],  // 26
+  ["Chermitti", "Ahmed", 13.34, 12.63],  // 27
+  ["Chtioui", "Marwa", 12.29, 11.96],  // 28
+  ["Dami", "Sabrine", 12.20, 10.42],  // 29
+  ["Fennani", "Hassen", 13.06, 11.95],  // 30
+  ["Gdoura", "Asma", 10.96, 12.50],  // 31
+  ["Ghazouani", "Nizar", 11.77, 12.43],  // 32
+  ["Hafiene", "Taheni", 11.88, 11.32],  // 33
+  ["Hammami", "Rawia", 10.99, 10.71],  // 34
+  ["Hasni", "Zoubeir", 10.06, 10.87],  // 35
+  ["Hellal", "Yesmine", 11.70, 10.69],  // 36
+  ["Jaouadi", "Hadhami", 14.11, 12.92],  // 37
+  ["Jaouadi", "Khaoula", 13.00, 12.84],  // 38
+  ["Kacem", "Fehmi", 11.72, 11.07],  // 39
+  ["Kacem", "Souha", 11.12, 12.96],  // 40
+  ["Kamoun", "Amira", 12.20, 10.41],  // 41
+  ["Khedhiri", "Khaoula", 14.59, 14.49],  // 42
+  ["Khiary", "Fares", 13.60, 11.90],  // 43
+  ["Khlifi", "Hiba", 12.94, 11.35],  // 44
+  ["Kraiem", "Abir", 11.87, 11.03],  // 45
+  ["Kridene", "Malek", 13.86, 12.51],  // 46
+  ["Lahmer", "Feten", 13.71, 11.83],  // 47
+  ["Malouche", "Nouha", 12.60, 12.24],  // 48
+  ["Meddeb", "Yomna", 13.32, 11.23],  // 49
+  ["Mhadhbi", "Aya", 14.11, 12.35],  // 50
+  ["Mighri", "Rimeh", 11.39, 11.24],  // 51
+  ["Nalouti", "Haythem", 11.46, 8.81],  // 52
+  ["Nasr", "Emna", 11.76, 12.09],  // 53
+  ["Nefzi", "Nesrine", 12.93, 12.50],  // 54
+  ["Rachdi", "Oumeima", 13.32, 10.62],  // 55
+  ["Rezgui", "Yosra", 12.29, 11.01],  // 56
+  ["Rmili", "Meriem", 12.69, 12.06],  // 57
+  ["Saidi", "Takwa", 13.97, 13.93],  // 58
+  ["Sallami", "Nour", 12.40, 13.63],  // 59
+  ["Sayadi", "Sabrine", 12.45, 12.61],  // 60
+  ["Sghaier", "Sirine", 12.66, 11.27],  // 61
+  ["Smitti", "MajdEddine", 10.78, 2.30],  // 62
+  ["Soltani", "Sinda", 13.94, 13.79],  // 63
+  ["Souissi", "Abir", 11.54, 11.61],  // 64
+  ["Tarhouni", "Sabri", 12.28, 10.23],  // 65
+  ["Tahri", "Marwa", 12.77, 11.43],  // 66
+  ["Teyeb", "Marwa", 12.20, 11.39],  // 67
+  ["Trabelsi", "Amani", 12.68, 11.23],  // 68
+  ["Trabelsi", "Rayhane", 11.85, 10.13],  // 69
+  ["Yahmadi", "Rihab", 11.27, 10.83],  // 70
+  ["Zaghouani", "Taoufik", 11.77, 12.67],  // 71
+  ["Zammel", "Amal", 13.14, 11.75],  // 72
+  ["Zarrouk", "Cyrine", 11.75, 10.70],  // 73
+  ["Zouari", "Hela Beya", 11.75, 11.90],  // 74
+];
+const SPECIAL_NUMBER = 62; // gets "Bonne chance" instead of results
+const PASS_LIMIT = 52;
+
+const f32 = Math.fround;
+
+// Moyenne Cycle = (CBA + 2 x CH2) / 3 with a 0.5 bonus on each part,
+// except for the students the original hard-codes.
+function cycleAverage(number, cba, ch2) {
+  if (number === 35) { const t = (ch2 + 9.68) / 2 - 0.5; return f32((cba + 0.5 + 2 * t) / 3); }
+  if (number === 52) return f32(((cba + 9.89) / 2 - 0.5 + 19.38) / 3);
+  if (number === 70) return f32(((cba + 9.47) / 2 - 0.5 + 21.66) / 3);
+  if ([4, 12, 34, 69].includes(number)) return f32((cba + 0.5 + 2 * ch2) / 3);
+  return f32((cba + 0.5 + 2 * (ch2 + 0.5)) / 3);
+}
+
+const rankOf = (values, v) => 1 + values.filter(x => x > v).length;
+const TOTAL = STUDENTS.length;
+// Which tenth of the class rank r falls in: 1 for the top 10%, ...
+const tenth = r => Math.ceil((r * 10) / TOTAL);
+
+const students = STUDENTS.map(([nom, prenom, cba, ch2], i) => {
+  const number = i + 1;
+  cba = f32(cba); ch2 = f32(ch2);
+  return { number, nom, prenom, cba, ch2, cycle: cycleAverage(number, cba, ch2) };
+});
+for (const field of ["cba", "ch2", "cycle"]) {
+  const values = students.map(s => s[field]);
+  for (const s of students) s["rank_" + field] = rankOf(values, s[field]);
+}
+window.__students = students; // handy for checking against cycle.py
+
+const STATS = [
+  { field: "cba", label: "MOYENNE CBA", digits: 2, color: "#34d399", subject: "CBA" },
+  { field: "ch2", label: "MOYENNE CH2", digits: 2, color: "#fb7185", subject: "CH2" },
+  { field: "cycle", label: "MOYENNE CYCLE", digits: 3, color: "#a78bfa", subject: "du cycle ingénieur" },
+];
+
+function bandLabel(r, field) {
+  const t = tenth(r);
+  if (r === 1) return "★ MAJOR";
+  if (t <= (field === "cycle" ? 6 : 5)) return `TOP ${t}0%`;
+  if (field === "cycle") return r <= PASS_LIMIT ? `TOP ${PASS_LIMIT}` : `HORS TOP ${PASS_LIMIT}`;
+  return "2ᵉ MOITIÉ";
+}
+
+function sentence(stat, s) {
+  const r = s["rank_" + stat.field], t = tenth(r);
+  if (r === 1) return `Meilleure moyenne ${stat.subject} de la promo !`;
+  if (t <= (stat.field === "cycle" ? 6 : 5)) return `Parmi les ${t}0% meilleures moyennes ${stat.subject}.`;
+  if (stat.field !== "cycle") return `Dans la deuxième moitié des moyennes ${stat.subject}.`;
+  if (r <= PASS_LIMIT) return `Parmi les ${PASS_LIMIT} meilleures moyennes ${stat.subject}.`;
+  return `Parmi les ${TOTAL - PASS_LIMIT - 1} dernières moyennes ${stat.subject}.`;
+}
+
+const normalize = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const fullName = s => `${s.prenom} ${s.nom}`;
+const escapeHtml = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+// ---------------------------------------------------------------------------
+// Scene
+// ---------------------------------------------------------------------------
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const container = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+container.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer({ element: document.getElementById("labels") });
+labelRenderer.setSize(innerWidth, innerHeight);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#05060d");
+scene.fog = new THREE.FogExp2("#05060d", 0.012);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 1000);
+camera.position.set(30, 20, 36);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 6;
+controls.maxDistance = 70;
+controls.autoRotate = !reduceMotion;
+controls.autoRotateSpeed = 0.35;
+
+scene.add(new THREE.AmbientLight("#8080ff", 0.35));
+const key = new THREE.PointLight("#c4b5fd", 60, 80);
+key.position.set(10, 18, 12);
+scene.add(key);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.4, 0.2);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// Starfield and drifting dust
+function points(count, spread, size, colors, opacity) {
+  const pos = new Float32Array(count * 3), col = new Float32Array(count * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    const v = spread(i);
+    pos.set([v.x, v.y, v.z], i * 3);
+    c.set(colors[i % colors.length]).multiplyScalar(0.6 + Math.random() * 0.4);
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  return new THREE.Points(g, new THREE.PointsMaterial({ size, vertexColors: true, transparent: true, opacity,
+    depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+}
+const stars = points(4000, () => new THREE.Vector3().randomDirection().multiplyScalar(150 + Math.random() * 250),
+  0.9, ["#ffffff", "#c4b5fd", "#93c5fd", "#fde68a"], 0.85);
+scene.add(stars);
+const dust = points(900, () => new THREE.Vector3((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 40),
+  0.12, ["#22d3ee", "#a78bfa", "#f472b6"], 0.5);
+scene.add(dust);
+
+// Axes: X = CBA, Y = cycle, Z = CH2, mapped into a cube of half-size S
+const S = 10;
+const regular = students.filter(s => s.number !== SPECIAL_NUMBER);
+function range(field) {
+  const v = regular.map(s => s[field]);
+  return [Math.floor(Math.min(...v) * 2) / 2, Math.ceil(Math.max(...v) * 2) / 2];
+}
+const RANGES = { cba: range("cba"), ch2: range("ch2"), cycle: range("cycle") };
+const map = (field, v) => {
+  const [lo, hi] = RANGES[field];
+  return THREE.MathUtils.clamp(((v - lo) / (hi - lo)) * 2 - 1, -1.05, 1.05) * S;
+};
+const positionOf = s => new THREE.Vector3(map("cba", s.cba), map("cycle", s.cycle), map("ch2", s.ch2));
+
+function label(text, cls, pos, color) {
+  const el = document.createElement("div");
+  el.className = cls;
+  el.textContent = text;
+  if (color) el.style.color = color;
+  const obj = new CSS2DObject(el);
+  obj.position.copy(pos);
+  scene.add(obj);
+  return obj;
+}
+
+const grid = new THREE.GridHelper(2 * S, 20, "#3b2f6b", "#1a1830");
+grid.position.y = -S;
+grid.material.transparent = true;
+grid.material.opacity = 0.7;
+scene.add(grid);
+
+const axisMat = c => new THREE.LineBasicMaterial({ color: c, transparent: true, opacity: 0.55 });
+function axis(from, to, color) {
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([from, to]), axisMat(color)));
+}
+const o = new THREE.Vector3(-S, -S, -S);
+axis(o, new THREE.Vector3(S, -S, -S), "#34d399");
+axis(o, new THREE.Vector3(-S, S, -S), "#a78bfa");
+axis(o, new THREE.Vector3(-S, -S, S), "#fb7185");
+label("CBA", "axis-title", new THREE.Vector3(S + 1.6, -S, -S), "#34d399");
+label("CYCLE", "axis-title", new THREE.Vector3(-S, S + 1.2, -S), "#a78bfa");
+label("CH2", "axis-title", new THREE.Vector3(-S, -S, S + 1.6), "#fb7185");
+for (const [field, make] of [
+  ["cba", v => new THREE.Vector3(map("cba", v), -S - 0.9, -S - 0.6)],
+  ["cycle", v => new THREE.Vector3(-S - 0.9, map("cycle", v), -S - 0.6)],
+  ["ch2", v => new THREE.Vector3(-S - 0.9, -S - 0.6, map("ch2", v))],
+]) {
+  const [lo, hi] = RANGES[field];
+  for (let v = Math.ceil(lo); v <= hi; v++) label(String(v), "axis-label", make(v));
+}
+
+// Pass threshold: halfway between the last passing and first failing cycle average
+const byCycle = [...students].sort((a, b) => a.rank_cycle - b.rank_cycle);
+const cutoff = (byCycle[PASS_LIMIT - 1].cycle + byCycle[PASS_LIMIT].cycle) / 2;
+const planeY = map("cycle", cutoff);
+const plane = new THREE.Mesh(new THREE.PlaneGeometry(2 * S, 2 * S),
+  new THREE.MeshBasicMaterial({ color: "#4ade80", transparent: true, opacity: 0.05, side: THREE.DoubleSide, depthWrite: false }));
+plane.rotation.x = -Math.PI / 2;
+plane.position.y = planeY;
+scene.add(plane);
+const planeEdge = new THREE.LineSegments(new THREE.EdgesGeometry(plane.geometry),
+  new THREE.LineBasicMaterial({ color: "#4ade80", transparent: true, opacity: 0.6 }));
+planeEdge.rotation.copy(plane.rotation);
+planeEdge.position.copy(plane.position);
+scene.add(planeEdge);
+label(`SEUIL DE PASSAGE · TOP ${PASS_LIMIT} · ${cutoff.toFixed(2)}`, "plane-label", new THREE.Vector3(S, planeY + 0.6, S));
+
+// Students as glowing orbs
+function colorOf(s) {
+  if (s.number === SPECIAL_NUMBER) return new THREE.Color("#93c5fd");
+  if (s.rank_cycle === 1) return new THREE.Color("#fde047");
+  if (s.rank_cycle > PASS_LIMIT) return new THREE.Color("#f87171");
+  const t = (s.rank_cycle - 2) / (PASS_LIMIT - 2);
+  return new THREE.Color("#22d3ee").lerp(new THREE.Color("#a78bfa"), Math.min(1, t * 1.4))
+    .lerp(new THREE.Color("#f472b6"), Math.max(0, t * 1.4 - 0.4) / 1.4);
+}
+
+const orbGeo = new THREE.SphereGeometry(0.26, 32, 16);
+const haloTex = (() => {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, "rgba(255,255,255,0.9)");
+  grad.addColorStop(0.25, "rgba(255,255,255,0.25)");
+  grad.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+
+const orbs = students.map(s => {
+  const color = colorOf(s);
+  const special = s.number === SPECIAL_NUMBER;
+  const mesh = new THREE.Mesh(orbGeo, new THREE.MeshStandardMaterial({
+    color, emissive: color, emissiveIntensity: special ? 0.4 : 0.9, roughness: 0.35, metalness: 0.1,
+    transparent: special, opacity: special ? 0.55 : 1,
+  }));
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color, transparent: true, opacity: special ? 0.2 : 0.4,
+    depthWrite: false, blending: THREE.AdditiveBlending }));
+  halo.scale.setScalar(s.rank_cycle === 1 ? 2.0 : 1.25);
+  mesh.add(halo);
+  if (s.rank_cycle === 1) mesh.scale.setScalar(1.3);
+  mesh.userData = {
+    student: s, target: positionOf(s), start: new THREE.Vector3().randomDirection().multiplyScalar(60 + Math.random() * 40),
+    delay: Math.random() * 0.9 + (TOTAL - s.rank_cycle) / TOTAL * 0.6, phase: Math.random() * Math.PI * 2,
+    baseScale: mesh.scale.x, hover: 0,
+  };
+  mesh.position.copy(mesh.userData.start);
+  scene.add(mesh);
+  return mesh;
+});
+
+// Selection marker: pulsing ring, drop line, floor ring
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.62, 0.7, 64),
+  new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+ring.visible = false;
+scene.add(ring);
+const dropLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+  new THREE.LineDashedMaterial({ color: "#ffffff", dashSize: 0.3, gapSize: 0.2, transparent: true, opacity: 0.5 }));
+dropLine.visible = false;
+scene.add(dropLine);
+const floorRing = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 48),
+  new THREE.MeshBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.5, side: THREE.DoubleSide }));
+floorRing.rotation.x = -Math.PI / 2;
+floorRing.visible = false;
+scene.add(floorRing);
+
+// Hover tooltip
+const tipEl = document.createElement("div");
+tipEl.className = "tip";
+const tip = new CSS2DObject(tipEl);
+scene.add(tip);
+
+// Confetti bursts
+const bursts = [];
+function burst(pos, palette, count = 420) {
+  const geo = new THREE.BufferGeometry();
+  const p = new Float32Array(count * 3), c = new Float32Array(count * 3), v = [];
+  const col = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    p.set([pos.x, pos.y, pos.z], i * 3);
+    col.set(palette[i % palette.length]);
+    c.set([col.r, col.g, col.b], i * 3);
+    v.push(new THREE.Vector3().randomDirection().multiplyScalar(3 + Math.random() * 7).add(new THREE.Vector3(0, 3, 0)));
+  }
+  geo.setAttribute("position", new THREE.BufferAttribute(p, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(c, 3));
+  const mat = new THREE.PointsMaterial({ size: 0.16, map: haloTex, vertexColors: true, transparent: true, opacity: 1,
+    depthWrite: false, blending: THREE.AdditiveBlending });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+  bursts.push({ pts, v, age: 0 });
+}
+
+// ---------------------------------------------------------------------------
+// Camera flights
+// ---------------------------------------------------------------------------
+
+let flight = null;
+function flyTo(target, distance) {
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  dir.y = Math.max(dir.y, 0.25);
+  dir.normalize();
+  flight = {
+    t: 0, duration: reduceMotion ? 0.01 : 1.6,
+    fromPos: camera.position.clone(), toPos: target.clone().add(dir.multiplyScalar(distance)),
+    fromTarget: controls.target.clone(), toTarget: target.clone(),
+  };
+}
+const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+// ---------------------------------------------------------------------------
+// Panel
+// ---------------------------------------------------------------------------
+
+const panel = document.getElementById("panel");
+let selected = null;
+let selectToken = 0;
+
+function histogram(field, value, bins = 26) {
+  const values = students.map(s => s[field]);
+  const [lo, hi] = RANGES[field];
+  const col = v => Math.max(0, Math.min(bins - 1, Math.floor(((v - lo) / (hi - lo)) * bins)));
+  const counts = Array(bins).fill(0);
+  values.forEach(v => counts[col(v)]++);
+  const peak = Math.max(...counts), mine = col(value);
+  return {
+    html: counts.map((n, i) => `<i class="${i === mine ? "me" : ""}" data-h="${n ? Math.max(0.08, n / peak) : 0}"></i>`).join(""),
+    lo, hi,
+  };
+}
+
+function countUp(el, to, digits, duration, token) {
+  const start = performance.now();
+  const from = to * 0.6;
+  (function step(now) {
+    if (token !== selectToken) return;
+    const t = THREE.MathUtils.clamp((now - start) / duration, 0, 1);
+    el.textContent = (from + (to - from) * easeOut(t)).toFixed(digits);
+    if (t < 1) requestAnimationFrame(step);
+  })(start);
+}
+function countDown(el, to, duration, token) {
+  const start = performance.now();
+  (function step(now) {
+    if (token !== selectToken) return;
+    const t = THREE.MathUtils.clamp((now - start) / duration, 0, 1);
+    el.textContent = Math.round(TOTAL - (TOTAL - to) * easeOut(t));
+    if (t < 1) requestAnimationFrame(step);
+  })(start);
+}
+
+function header(s) {
+  return `
+    <div class="top">
+      <span class="num">N° ${String(s.number).padStart(2, "0")} / ${TOTAL}</span>
+      <div class="nav">
+        <button class="icon-btn" data-step="-1" title="Précédent (←)" aria-label="Précédent">‹</button>
+        <button class="icon-btn" data-step="1" title="Suivant (→)" aria-label="Suivant">›</button>
+        <button class="icon-btn" data-close title="Fermer (Échap)" aria-label="Fermer">✕</button>
+      </div>
+    </div>
+    <h2 class="grad">${escapeHtml(fullName(s))}</h2>
+    <div class="sub">CH2 · 2014–2015</div>`;
+}
+
+function renderPanel(s) {
+  const token = ++selectToken;
+  if (s.number === SPECIAL_NUMBER) {
+    panel.innerHTML = header(s) + `
+      <div id="verdict" style="margin-top:22px">
+        <div><div class="big g-soft" style="letter-spacing:.06em;font-size:22px">Bonne chance pour l'année prochaine</div>
+        <div class="msg">${escapeHtml(s.prenom)}</div></div>
+      </div>`;
+    panel.classList.add("open");
+    return;
+  }
+  panel.innerHTML = header(s) + STATS.map((stat, i) => {
+    const r = s["rank_" + stat.field];
+    const h = histogram(stat.field, s[stat.field]);
+    const medal = r === 1 ? ` <span style="color:var(--gold)">★</span>` : r <= 3 ? ` <span style="color:#e5e7eb">✦</span>` : "";
+    return `
+      <div class="card" style="--accent:${stat.color}; animation-delay:${0.15 + i * 0.12}s">
+        <div class="head"><span class="label">${stat.label}</span><span class="chip">${bandLabel(r, stat.field)}</span></div>
+        <div class="row">
+          <span class="value" data-value="${s[stat.field]}" data-digits="${stat.digits}">0</span>
+          <span class="rank">RANG <b data-rank="${r}">${TOTAL}</b> / ${TOTAL}${medal}</span>
+        </div>
+        <div class="hist">${h.html}</div>
+        <div class="scale"><span>${h.lo}</span><span>${h.hi}</span></div>
+        <div class="sentence">${sentence(stat, s)}</div>
+      </div>`;
+  }).join("") + `<div id="verdict"><div class="wait">Délibération du jury<span>.</span><span>.</span><span>.</span></div></div>`;
+  panel.classList.add("open");
+  panel.scrollTop = 0;
+
+  panel.querySelectorAll(".value").forEach((el, i) =>
+    setTimeout(() => countUp(el, +el.dataset.value, +el.dataset.digits, 1300, token), 250 + i * 150));
+  panel.querySelectorAll("[data-rank]").forEach((el, i) =>
+    setTimeout(() => countDown(el, +el.dataset.rank, 1300, token), 250 + i * 150));
+  setTimeout(() => {
+    if (token !== selectToken) return;
+    panel.querySelectorAll(".hist i").forEach(b => (b.style.transform = `scaleY(${b.dataset.h})`));
+  }, 450);
+  setTimeout(() => {
+    if (token !== selectToken) return;
+    panel.querySelectorAll(".chip").forEach(c => c.classList.add("show"));
+  }, 1700);
+  setTimeout(() => token === selectToken && showVerdict(s), reduceMotion ? 300 : 2600);
+}
+
+function showVerdict(s) {
+  const v = document.getElementById("verdict");
+  const r = s.rank_cycle, first = escapeHtml(s.prenom.split(" ")[0]);
+  const orb = orbs[s.number - 1];
+  if (r === 1) {
+    v.className = "major";
+    v.innerHTML = `<div><div class="big g-major">★ MAJOR DE PROMO ★</div>
+      <div class="msg">Félicitations ${first} ! Passage garanti, in sha'ALLAH.</div>
+      <div class="msg2">${sentence(STATS[2], s)}</div></div>`;
+    burst(orb.position, ["#fde047", "#f59e0b", "#ffffff", "#fbbf24"], 700);
+  } else if (r <= PASS_LIMIT) {
+    v.className = "pass";
+    v.innerHTML = `<div><div class="big g-pass">✔ PASSAGE GARANTI</div>
+      <div class="msg">Félicitations ${first} — in sha'ALLAH.</div>
+      <div class="msg2">${sentence(STATS[2], s)}</div></div>`;
+    burst(orb.position, ["#22c55e", "#a3e635", "#22d3ee", "#ffffff"]);
+  } else {
+    v.className = "fail";
+    v.innerHTML = `<div><div class="big g-fail">DÉSOLÉ ${first.toUpperCase()}</div>
+      <div class="msg2">${sentence(STATS[2], s)}</div></div>`;
+  }
+}
+
+function select(s) {
+  selected = s;
+  const orb = orbs[s.number - 1];
+  controls.autoRotate = false;
+  flyTo(orb.userData.target, innerWidth < 820 ? 22 : 17);
+  ring.visible = dropLine.visible = floorRing.visible = true;
+  const c = colorOf(s);
+  ring.material.color.copy(c);
+  floorRing.material.color.copy(c);
+  dropLine.material.color.copy(c);
+  renderPanel(s);
+  closeResults();
+}
+
+function deselect() {
+  selected = null;
+  selectToken++;
+  panel.classList.remove("open");
+  ring.visible = dropLine.visible = floorRing.visible = false;
+  flyTo(new THREE.Vector3(0, 0, 0), 30);
+  controls.autoRotate = !reduceMotion;
+}
+
+panel.addEventListener("click", e => {
+  const btn = e.target.closest("button");
+  if (!btn || !selected) return;
+  if (btn.hasAttribute("data-close")) deselect();
+  else if (btn.dataset.step) step(+btn.dataset.step);
+});
+function step(d) {
+  const n = selected ? ((selected.number - 1 + d + TOTAL) % TOTAL) : (d > 0 ? 0 : TOTAL - 1);
+  select(students[n]);
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+const q = document.getElementById("q");
+const results = document.getElementById("results");
+let matches = [], active = 0;
+
+function closeResults() { results.classList.remove("open"); }
+function findStudents(text) {
+  text = text.trim();
+  if (!text) return [];
+  if (/^\d+$/.test(text)) return students.filter(s => String(s.number).startsWith(text)).slice(0, 8);
+  const n = normalize(text);
+  return students.filter(s => normalize(fullName(s)).includes(n) || normalize(`${s.nom} ${s.prenom}`).includes(n)).slice(0, 8);
+}
+function drawResults() {
+  results.innerHTML = matches.length
+    ? matches.map((s, i) => `<button role="option" class="${i === active ? "active" : ""}" data-n="${s.number}">
+        <span class="n">${s.number}</span><span>${escapeHtml(fullName(s))}</span>
+        <span class="avg">${s.number === SPECIAL_NUMBER ? "—" : s.cycle.toFixed(3)}</span></button>`).join("")
+    : `<div class="none">Aucun étudiant ne correspond.</div>`;
+  results.classList.toggle("open", q.value.trim() !== "");
+}
+q.addEventListener("input", () => { matches = findStudents(q.value); active = 0; drawResults(); });
+q.addEventListener("keydown", e => {
+  if (e.key === "ArrowDown" && matches.length) { active = (active + 1) % matches.length; drawResults(); e.preventDefault(); }
+  else if (e.key === "ArrowUp" && matches.length) { active = (active - 1 + matches.length) % matches.length; drawResults(); e.preventDefault(); }
+  else if (e.key === "Enter" && matches.length) { select(matches[active]); q.value = ""; q.blur(); }
+  else if (e.key === "Escape") { q.value = ""; closeResults(); q.blur(); }
+  e.stopPropagation();
+});
+results.addEventListener("click", e => {
+  const b = e.target.closest("button[data-n]");
+  if (b) { select(students[+b.dataset.n - 1]); q.value = ""; }
+});
+
+addEventListener("keydown", e => {
+  if (!introDone) return;
+  if (e.key === "/") { q.focus(); e.preventDefault(); }
+  else if (e.key === "Escape" && selected) deselect();
+  else if (e.key === "ArrowRight") step(1);
+  else if (e.key === "ArrowLeft") step(-1);
+});
+
+// ---------------------------------------------------------------------------
+// Picking
+// ---------------------------------------------------------------------------
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let hovered = null, downAt = null;
+
+function pick(e) {
+  pointer.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObjects(orbs, false)[0];
+  return hit ? hit.object : null;
+}
+renderer.domElement.addEventListener("pointermove", e => {
+  if (!introDone) return;
+  hovered = pick(e);
+  renderer.domElement.style.cursor = hovered ? "pointer" : "grab";
+  if (hovered) {
+    const s = hovered.userData.student;
+    tipEl.innerHTML = `<span class="n">${s.number}</span>${escapeHtml(fullName(s))}<span class="v">${
+      s.number === SPECIAL_NUMBER ? "" : s.cycle.toFixed(3)}</span>`;
+    tip.position.copy(hovered.position);
+  }
+  tipEl.classList.toggle("show", !!hovered);
+});
+renderer.domElement.addEventListener("pointerdown", e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener("pointerup", e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const o = pick(e);
+  if (o) select(o.userData.student);
+});
+controls.addEventListener("start", () => { flight = null; });
+
+// ---------------------------------------------------------------------------
+// Intro and loop
+// ---------------------------------------------------------------------------
+
+let introDone = false, assembleStart = null;
+function enter() {
+  if (introDone) return;
+  introDone = true;
+  document.getElementById("intro").classList.add("hidden");
+  assembleStart = clock.getElapsedTime();
+  flyTo(new THREE.Vector3(0, 0, 0), 30);
+  // index.html#43 opens student 43 once the orbs have assembled
+  const n = +location.hash.slice(1);
+  if (n >= 1 && n <= TOTAL) setTimeout(() => select(students[n - 1]), reduceMotion ? 0 : 3200);
+}
+document.getElementById("enter").addEventListener("click", enter);
+setTimeout(enter, reduceMotion ? 300 : 6000);
+
+const clock = new THREE.Clock();
+const viewShift = [0, 0];
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.getElapsedTime();
+
+  stars.rotation.y += dt * 0.004;
+  dust.rotation.y -= dt * 0.02;
+  dust.rotation.x = Math.sin(time * 0.05) * 0.1;
+
+  for (const orb of orbs) {
+    const u = orb.userData;
+    let k = 0;
+    if (assembleStart !== null) k = reduceMotion ? 1 : easeOut(THREE.MathUtils.clamp((time - assembleStart - u.delay) / 2.2, 0, 1));
+    orb.position.lerpVectors(u.start, u.target, k);
+    if (k === 1 && !reduceMotion) orb.position.y += Math.sin(time * 1.2 + u.phase) * 0.06;
+    u.hover += ((orb === hovered || u.student === selected ? 1 : 0) - u.hover) * 0.15;
+    orb.scale.setScalar(u.baseScale * (0.2 + 0.8 * k) * (1 + 0.45 * u.hover));
+  }
+
+  if (selected) {
+    const orb = orbs[selected.number - 1];
+    ring.position.copy(orb.position);
+    ring.lookAt(camera.position);
+    ring.scale.setScalar(orb.scale.x * (1 + 0.12 * Math.sin(time * 4)));
+    ring.material.opacity = 0.55 + 0.35 * Math.sin(time * 4);
+    floorRing.position.set(orb.position.x, -S + 0.01, orb.position.z);
+    floorRing.scale.setScalar(1 + ((time * 0.8) % 1) * 1.5);
+    floorRing.material.opacity = 0.6 * (1 - ((time * 0.8) % 1));
+    const p = dropLine.geometry.attributes.position;
+    p.setXYZ(0, orb.position.x, orb.position.y, orb.position.z);
+    p.setXYZ(1, orb.position.x, -S, orb.position.z);
+    p.needsUpdate = true;
+    dropLine.computeLineDistances();
+  }
+  if (hovered) tip.position.copy(hovered.position);
+
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    const b = bursts[i];
+    b.age += dt;
+    const p = b.pts.geometry.attributes.position;
+    b.v.forEach((v, j) => {
+      v.y -= 6 * dt;
+      v.multiplyScalar(1 - 1.2 * dt);
+      p.setXYZ(j, p.getX(j) + v.x * dt, p.getY(j) + v.y * dt, p.getZ(j) + v.z * dt);
+    });
+    p.needsUpdate = true;
+    b.pts.material.opacity = Math.max(0, 1 - b.age / 2.4);
+    if (b.age > 2.4) { scene.remove(b.pts); b.pts.geometry.dispose(); b.pts.material.dispose(); bursts.splice(i, 1); }
+  }
+
+  plane.material.opacity = 0.04 + 0.02 * Math.sin(time * 1.5);
+
+  if (flight) {
+    flight.t = Math.min(1, flight.t + dt / flight.duration);
+    const e = easeInOut(flight.t);
+    camera.position.lerpVectors(flight.fromPos, flight.toPos, e);
+    controls.target.lerpVectors(flight.fromTarget, flight.toTarget, e);
+    if (flight.t === 1) flight = null;
+  }
+  const shift = panel.classList.contains("open")
+    ? (innerWidth < 820 ? [0, panel.offsetHeight / 2] : [(panel.offsetWidth + 16) / 2, 0]) : [0, 0];
+  viewShift[0] += (shift[0] - viewShift[0]) * 0.08;
+  viewShift[1] += (shift[1] - viewShift[1]) * 0.08;
+  camera.setViewOffset(innerWidth, innerHeight, viewShift[0], viewShift[1], innerWidth, innerHeight);
+  controls.update();
+  composer.render();
+  labelRenderer.render(scene, camera);
+}
+animate();
+
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+  labelRenderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05060d">
+<title>Bulletin · Moyennes Cycle et Rangs</title>
+<meta name="description" content="INSAT CH2 2014–2015 : bulletin.py dans le navigateur, façon console.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #05060d;
+  --text: #e8e9f3;
+  --bar: rgba(14, 16, 32, 0.85);
+  --line: rgba(167, 139, 250, 0.18);
+  --cyan: #22d3ee;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-height: 100dvh; background: var(--bg); color: var(--text);
+  font: 400 clamp(12.5px, 3.4vw, 15px)/1.4 "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; }
+button, input { font: inherit; color: inherit; }
+
+/* Fake terminal window bar */
+.bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 1.2ch;
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px; background: var(--bar);
+  border-bottom: 1px solid var(--line); color: #8b8fa8; font-size: 12px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.bar i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+.bar i:nth-child(1) { background: #ff5f57; }
+.bar i:nth-child(2) { background: #febc2e; }
+.bar i:nth-child(3) { background: #28c840; }
+.bar a { margin-left: auto; color: inherit; text-decoration: none; }
+.bar a:hover { color: var(--text); }
+
+#out { padding: 12px max(16px, env(safe-area-inset-right)) calc(5em + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  max-width: 900px; margin: 0 auto; }
+.ln, .g > div { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 1.4em; }
+.g > .nw, .nw { white-space: pre; overflow-wrap: normal; }
+.c { text-align: center; text-wrap: balance; }
+.b { font-weight: 700; }
+.i { font-style: italic; }
+.dim { opacity: 0.5; }
+.bullet { padding-left: 4ch; text-indent: -4ch; }
+
+/* rich boxes */
+.panel { border: 1px solid var(--b, #585858); width: 100%; max-width: 78ch; margin: 0 auto; overflow: hidden; }
+.rounded { border-radius: 10px; }
+.heavy { border-width: 2px; border-radius: 2px; }
+.double { border: 4px double var(--b); }
+.pad12 { padding: 1.4em 2ch; }
+.pad02 { padding: 0 2ch; }
+.pad01 { padding: 0 1ch; }
+
+.rule { display: flex; align-items: center; gap: 1ch; }
+.rule::before, .rule::after { content: ""; flex: 1; border-top: 1px solid #3a3a3a; }
+
+.cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6em 0; }
+.card { width: 26ch; margin: 0; }
+.big > div { line-height: 1.2; }
+.hist > div { line-height: 1.05; min-height: 1.05em; }
+.hist > div:nth-child(3) { line-height: 1.4; }
+.chip { color: #000; font-weight: 700; }
+
+/* Input */
+.ask { display: flex; flex-wrap: wrap; align-items: center; min-height: 44px; cursor: text; }
+.ask input { flex: 1 1 8ch; min-width: 8ch; padding: 4px 0; border: 0; outline: 0; background: transparent;
+  color: #fff; caret-color: var(--cyan); font-size: max(16px, 1em); /* no iOS zoom on focus */ }
+.echo { color: #fff; white-space: pre; }
+.choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.choices button, .restart { min-height: 44px; padding: 0 1.6ch; border: 1px solid var(--line); border-radius: 8px;
+  background: rgba(167, 139, 250, 0.08); cursor: pointer; }
+.choices button:active, .restart:active, .match:active { background: rgba(34, 211, 238, 0.18); }
+.matches { margin: 0.4em 0; }
+.match { display: flex; gap: 1ch; width: 100%; min-height: 40px; align-items: center; padding: 0 1ch;
+  border: 0; border-radius: 6px; background: none; text-align: left; cursor: pointer; }
+.match:hover { background: rgba(255, 255, 255, 0.05); }
+.match .n { color: var(--cyan); min-width: 3ch; text-align: right; }
+
+/* "Tap to skip" hint while something animates */
+.hint { position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translate(-50%, 8px);
+  padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--bar);
+  color: #8b8fa8; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; }
+.hint.on { opacity: 1; transform: translate(-50%, 0); }
+.probe { position: absolute; visibility: hidden; white-space: pre; }
+</style>
+</head>
+<body>
+<header class="bar"><span><i></i><i></i><i></i></span><span>python3 bulletin.py</span><a href="index.html">3D ↗</a></header>
+<main id="out" aria-live="polite"></main>
+<div class="hint" id="hint">Toucher pour passer ⏭</div>
+
+<script type="module">
+// ---------------------------------------------------------------------------
+// Data (same table and rules as cycle.py)
+// ---------------------------------------------------------------------------
+
+// [nom, prenom, Moyenne CBA, Moyenne CH2], in student-number order
+const STUDENTS = [
+  ["Abidi", "Mohamed", 12.06, 11.11],  // 1
+  ["Achour", "Nadya", 12.82, 12.01],  // 2
+  ["Aidoudi", "Meriem", 12.19, 12.29],  // 3
+  ["Ajlani", "Mahdi", 11.88, 10.36],  // 4
+  ["Athamna", "Jawaher", 12.06, 12.98],  // 5
+  ["Ayadi", "Nouha", 12.30, 10.90],  // 6
+  ["Baccar", "Nada", 12.79, 12.56],  // 7
+  ["Baccouche", "Oumayma", 12.16, 11.63],  // 8
+  ["Baccouche", "Hala", 12.22, 11.70],  // 9
+  ["Baraket", "Nada", 12.90, 11.09],  // 10
+  ["Barguellil", "Sana", 11.29, 11.16],  // 11
+  ["Bargui", "Emna", 10.60, 11.14],  // 12
+  ["Barraj", "Souad", 12.32, 12.08],  // 13
+  ["Bel Skander", "Sabrine", 12.25, 10.31],  // 14
+  ["Ben Abdessamad", "Montassar", 11.34, 10.56],  // 15
+  ["Ben Ali", "Rafeh", 12.22, 11.11],  // 16
+  ["Ben Bouzayen", "Abir", 13.34, 12.12],  // 17
+  ["Ben Osman", "Yasmine", 11.91, 11.66],  // 18
+  ["Ben Wannes", "Chayma", 11.75, 10.59],  // 19
+  ["Borgini", "Ahmed", 12.60, 11.79],  // 20
+  ["Bouaziz", "Nouha", 12.14, 10.76],  // 21
+  ["Boubaker", "Samar", 11.88, 10.37],  // 22
+  ["Brahmi", "Chayma", 13.71, 11.66],  // 23
+  ["Brouri", "Rania", 10.78, 10.74],  // 24
+  ["Bzainia", "Amir", 11.98, 10.30],  // 25
+  ["Chaouch", "Feriel", 12.32, 11.56],  // 26
+  ["Chermitti", "Ahmed", 13.34, 12.63],  // 27
+  ["Chtioui", "Marwa", 12.29, 11.96],  // 28
+  ["Dami", "Sabrine", 12.20, 10.42],  // 29
+  ["Fennani", "Hassen", 13.06, 11.95],  // 30
+  ["Gdoura", "Asma", 10.96, 12.50],  // 31
+  ["Ghazouani", "Nizar", 11.77, 12.43],  // 32
+  ["Hafiene", "Taheni", 11.88, 11.32],  // 33
+  ["Hammami", "Rawia", 10.99, 10.71],  // 34
+  ["Hasni", "Zoubeir", 10.06, 10.87],  // 35
+  ["Hellal", "Yesmine", 11.70, 10.69],  // 36
+  ["Jaouadi", "Hadhami", 14.11, 12.92],  // 37
+  ["Jaouadi", "Khaoula", 13.00, 12.84],  // 38
+  ["Kacem", "Fehmi", 11.72, 11.07],  // 39
+  ["Kacem", "Souha", 11.12, 12.96],  // 40
+  ["Kamoun", "Amira", 12.20, 10.41],  // 41
+  ["Khedhiri", "Khaoula", 14.59, 14.49],  // 42
+  ["Khiary", "Fares", 13.60, 11.90],  // 43
+  ["Khlifi", "Hiba", 12.94, 11.35],  // 44
+  ["Kraiem", "Abir", 11.87, 11.03],  // 45
+  ["Kridene", "Malek", 13.86, 12.51],  // 46
+  ["Lahmer", "Feten", 13.71, 11.83],  // 47
+  ["Malouche", "Nouha", 12.60, 12.24],  // 48
+  ["Meddeb", "Yomna", 13.32, 11.23],  // 49
+  ["Mhadhbi", "Aya", 14.11, 12.35],  // 50
+  ["Mighri", "Rimeh", 11.39, 11.24],  // 51
+  ["Nalouti", "Haythem", 11.46, 8.81],  // 52
+  ["Nasr", "Emna", 11.76, 12.09],  // 53
+  ["Nefzi", "Nesrine", 12.93, 12.50],  // 54
+  ["Rachdi", "Oumeima", 13.32, 10.62],  // 55
+  ["Rezgui", "Yosra", 12.29, 11.01],  // 56
+  ["Rmili", "Meriem", 12.69, 12.06],  // 57
+  ["Saidi", "Takwa", 13.97, 13.93],  // 58
+  ["Sallami", "Nour", 12.40, 13.63],  // 59
+  ["Sayadi", "Sabrine", 12.45, 12.61],  // 60
+  ["Sghaier", "Sirine", 12.66, 11.27],  // 61
+  ["Smitti", "MajdEddine", 10.78, 2.30],  // 62
+  ["Soltani", "Sinda", 13.94, 13.79],  // 63
+  ["Souissi", "Abir", 11.54, 11.61],  // 64
+  ["Tarhouni", "Sabri", 12.28, 10.23],  // 65
+  ["Tahri", "Marwa", 12.77, 11.43],  // 66
+  ["Teyeb", "Marwa", 12.20, 11.39],  // 67
+  ["Trabelsi", "Amani", 12.68, 11.23],  // 68
+  ["Trabelsi", "Rayhane", 11.85, 10.13],  // 69
+  ["Yahmadi", "Rihab", 11.27, 10.83],  // 70
+  ["Zaghouani", "Taoufik", 11.77, 12.67],  // 71
+  ["Zammel", "Amal", 13.14, 11.75],  // 72
+  ["Zarrouk", "Cyrine", 11.75, 10.70],  // 73
+  ["Zouari", "Hela Beya", 11.75, 11.90],  // 74
+];
+const SPECIAL_NUMBER = 62; // gets "Bonne chance" instead of results
+const PASS_LIMIT = 52;
+
+const f32 = Math.fround;
+
+// Moyenne Cycle = (CBA + 2 x CH2) / 3 with a 0.5 bonus on each part,
+// except for the students the original hard-codes.
+function cycleAverage(number, cba, ch2) {
+  if (number === 35) { const t = (ch2 + 9.68) / 2 - 0.5; return f32((cba + 0.5 + 2 * t) / 3); }
+  if (number === 52) return f32(((cba + 9.89) / 2 - 0.5 + 19.38) / 3);
+  if (number === 70) return f32(((cba + 9.47) / 2 - 0.5 + 21.66) / 3);
+  if ([4, 12, 34, 69].includes(number)) return f32((cba + 0.5 + 2 * ch2) / 3);
+  return f32((cba + 0.5 + 2 * (ch2 + 0.5)) / 3);
+}
+
+const rankOf = (values, v) => 1 + values.filter(x => x > v).length;
+const TOTAL = STUDENTS.length;
+// Which tenth of the class rank r falls in: 1 for the top 10%, ...
+const tenth = r => Math.ceil((r * 10) / TOTAL);
+
+const students = STUDENTS.map(([nom, prenom, cba, ch2], i) => {
+  const number = i + 1;
+  cba = f32(cba); ch2 = f32(ch2);
+  return { number, nom, prenom, cba, ch2, cycle: cycleAverage(number, cba, ch2) };
+});
+for (const field of ["cba", "ch2", "cycle"]) {
+  const values = students.map(s => s[field]);
+  for (const s of students) s["rank_" + field] = rankOf(values, s[field]);
+}
+window.__students = students; // handy for checking against cycle.py
+
+const normalize = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const fullName = s => `${s.prenom} ${s.nom}`;
+
+// ---------------------------------------------------------------------------
+// bulletin.py, in the browser
+// ---------------------------------------------------------------------------
+
+const out = document.getElementById("out");
+const hint = document.getElementById("hint");
+const ANIMATE = !matchMedia("(prefers-reduced-motion: reduce)").matches
+  && !new URLSearchParams(location.search).has("nodelay");
+const FPS = 30;
+const CARD_WIDTH = 26;
+
+const TITLE = ["#22d3ee", "#a78bfa", "#f472b6", "#fbbf24"];
+const GOLD = ["#fde047", "#f59e0b", "#fde047"];
+const PASS = ["#22c55e", "#a3e635", "#22d3ee"];
+const FAIL = ["#ef4444", "#f97316"];
+const SOFT = ["#93c5fd", "#c4b5fd"];
+// rich's greyNN colours
+const GREY = { 23: "#3a3a3a", 35: "#585858", 42: "#6c6c6c", 50: "#808080", 58: "#949494",
+  62: "#9e9e9e", 70: "#b2b2b2", 85: "#d9d9d9" };
+
+const STATS = [
+  { field: "cba", title: "MOYENNE CBA", digits: 2, colors: ["#34d399", "#22d3ee"], subject: "CBA" },
+  { field: "ch2", title: "MOYENNE CH2", digits: 2, colors: ["#fb7185", "#fb923c"], subject: "CH2" },
+  { field: "cycle", title: "MOYENNE CYCLE", digits: 3, colors: ["#a78bfa", "#f472b6"], subject: "du cycle ingénieur" },
+];
+
+// 3-row digits drawn with box characters
+const GLYPHS = {
+  "0": ["┏━┓", "┃ ┃", "┗━┛"],
+  "1": ["╺┓ ", " ┃ ", "╺┻╸"],
+  "2": ["┏━┓", "┏━┛", "┗━╸"],
+  "3": ["┏━┓", "╺━┫", "┗━┛"],
+  "4": ["╻ ╻", "┗━┫", "  ╹"],
+  "5": ["┏━╸", "┗━┓", "┗━┛"],
+  "6": ["┏━╸", "┣━┓", "┗━┛"],
+  "7": ["┏━┓", "  ┃", "  ╹"],
+  "8": ["┏━┓", "┣━┫", "┗━┛"],
+  "9": ["┏━┓", "┗━┫", "┗━┛"],
+  ".": [" ", " ", "▪"],
+  "-": ["   ", "╺━╸", "   "],
+  " ": ["   ", "   ", "   "],
+};
+
+// ---------------------------------------------------------------------------
+// Drawing helpers (rich stand-ins: each returns an HTML string)
+// ---------------------------------------------------------------------------
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const big = s => [0, 1, 2].map(row => [...s].map(c => GLYPHS[c][row]).join(" "));
+const spaced = s => [...s].join(" ");
+const ease = t => 1 - (1 - t) ** 3;
+
+const span = (text, color, cls = "") => `<span class="${cls}" style="color:${color}">${esc(text)}</span>`;
+const line = (html = "", cls = "") => `<div class="ln ${cls}">${html}</div>`;
+const blank = line();
+const panel = (html, { box = "rounded", border, pad = "pad12", cls = "" } = {}) =>
+  `<div class="panel ${box} ${pad} ${cls}" style="--b:${border}">${html}</div>`;
+
+// Colour at position x in [0, 1] along a gradient.
+function blend(stops, x) {
+  const seg = x * (stops.length - 1);
+  const i = Math.min(Math.trunc(seg), stops.length - 2), f = seg - i;
+  const rgb = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+  const a = rgb(stops[i]), b = rgb(stops[i + 1]);
+  return "#" + a.map((v, k) => Math.round(v + (b[k] - v) * f).toString(16).padStart(2, "0")).join("");
+}
+
+// Text coloured left to right; phase slides the gradient for shimmer.
+// wrap lets a line break between words (separated by three spaces).
+function gradient(lines, stops, phase = 0, { bold = true, wrap = false, cls = "" } = {}) {
+  if (typeof lines === "string") lines = [lines];
+  const width = Math.max(Math.max(...lines.map(l => [...l].length)) - 1, 1);
+  const color = col => {
+    const pos = (col / width + phase) % 2;
+    return blend(stops, pos <= 1 ? pos : 2 - pos);
+  };
+  const rows = lines.map(text => {
+    let col = 0;
+    const paint = part => [...part].map(ch => {
+      const c = color(col++);
+      return ch === " " ? " " : `<span style="color:${c}">${esc(ch)}</span>`;
+    }).join("");
+    if (!wrap) return `<div class="nw">${paint(text)}</div>`;
+    const html = text.split(/( {3})/).map(part =>
+      part === "   " ? paint(part) : `<span class="nw">${paint(part)}</span>`).join("");
+    return `<div>${html}</div>`;
+  });
+  return `<div class="g c ${bold ? "b" : ""} ${cls}">${rows.join("")}</div>`;
+}
+
+function seeded(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function sparkles(width, seed, stops) {
+  const rng = seeded(seed), pool = [..."✦✧⋆·" + " ".repeat(8)];
+  let html = "";
+  for (let i = 0; i < width; i++) {
+    const ch = pool[Math.floor(rng() * pool.length)];
+    html += ch === " " ? " " : span(ch, blend(stops, rng()));
+  }
+  return `<div class="ln nw c">${html}</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Console: output, timing, tap-to-skip
+// ---------------------------------------------------------------------------
+
+let charWidth = 8;
+function measure() {
+  const probe = Object.assign(document.createElement("span"), { className: "probe", textContent: "0".repeat(100) });
+  out.append(probe);
+  charWidth = probe.getBoundingClientRect().width / 100 || 8;
+  probe.remove();
+}
+const columns = () => Math.floor(out.clientWidth / charWidth) - 4;
+const panelWidth = () => Math.min(columns(), 78);
+
+let skipping = false;
+const wakers = new Set();
+function skip() {
+  if (skipping || activePrompt) return;
+  skipping = true;
+  for (const wake of wakers) wake();
+  wakers.clear();
+}
+addEventListener("pointerdown", skip);
+addEventListener("keydown", e => { if ([" ", "Enter", "Escape"].includes(e.key)) skip(); });
+
+function setBusy(on) {
+  hint.classList.toggle("on", on && ANIMATE);
+}
+
+const scrollEnd = () => scrollTo({ top: document.documentElement.scrollHeight });
+
+function mount(cls = "") {
+  const el = document.createElement("div");
+  el.className = cls;
+  out.append(el);
+  return el;
+}
+
+function print(html = blank) {
+  mount().innerHTML = html;
+  scrollEnd();
+}
+
+function clear() {
+  out.replaceChildren();
+  scrollTo({ top: 0 });
+}
+
+function pause(seconds) {
+  if (!ANIMATE || skipping) return Promise.resolve();
+  return new Promise(resolve => {
+    const id = setTimeout(done, seconds * 1000);
+    function done() { clearTimeout(id); wakers.delete(done); resolve(); }
+    wakers.add(done);
+  });
+}
+
+// Animates render(t) for t from 0 to 1, leaving the last frame on screen.
+function play(render, duration) {
+  const el = mount();
+  if (!ANIMATE || skipping) {
+    el.innerHTML = render(1);
+    scrollEnd();
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    const start = performance.now();
+    let shown = -1;
+    function frame(now) {
+      const t = skipping ? 1 : Math.min(1, (now - start) / (duration * 1000));
+      const n = Math.floor(t * duration * FPS);
+      if (n !== shown) {
+        shown = n;
+        el.innerHTML = render(t);
+        scrollEnd();
+      }
+      if (t < 1) requestAnimationFrame(frame);
+      else resolve();
+    }
+    el.innerHTML = render(0);
+    requestAnimationFrame(frame);
+  });
+}
+
+async function suspense(message, seconds) {
+  if (!ANIMATE || skipping) return;
+  const frames = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+  const el = mount();
+  let i = 0;
+  const draw = () => { el.innerHTML = line(span(frames[i++ % frames.length], "#a78bfa") + " " + span(message, GREY[70], "i")); };
+  draw();
+  scrollEnd();
+  const id = setInterval(draw, 80);
+  await pause(seconds);
+  clearInterval(id);
+  el.remove();
+}
+
+// Shows a prompt with an inline input; resolves with the trimmed answer.
+let activePrompt = null;
+function ask(promptHtml, choices = []) {
+  setBusy(false);
+  skipping = false;
+  print();
+  return new Promise(resolve => {
+    const el = mount();
+    el.innerHTML = `<label class="ask"><span class="ln">${promptHtml}</span><input autocomplete="off" autocapitalize="off"
+        autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Réponse"></label>`
+      + (choices.length ? `<div class="choices">${choices.map(([label, value]) =>
+        `<button type="button" data-v="${esc(value)}">${esc(label)}</button>`).join("")}</div>` : "");
+    const input = el.querySelector("input");
+    const submit = value => {
+      activePrompt = null;
+      input.replaceWith(Object.assign(document.createElement("span"), { className: "echo", textContent: value }));
+      el.querySelector(".choices")?.remove();
+      setBusy(true);
+      resolve(value.trim());
+    };
+    activePrompt = { submit };
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); submit(input.value); }
+    });
+    for (const b of el.querySelectorAll(".choices button")) b.addEventListener("click", () => submit(b.dataset.v));
+    scrollEnd();
+    input.focus({ preventScroll: true });
+  });
+}
+
+// Tapping a match in the list answers the prompt waiting below it.
+out.addEventListener("click", e => {
+  const match = e.target.closest(".match");
+  if (match && activePrompt) activePrompt.submit(match.dataset.n);
+});
+
+// ---------------------------------------------------------------------------
+// Verdicts
+// ---------------------------------------------------------------------------
+
+function bandLabel(r, field) {
+  const t = tenth(r);
+  if (r === 1) return "★ MAJOR";
+  if (t <= (field === "cycle" ? 6 : 5)) return `TOP ${t}0%`;
+  if (field === "cycle") return r <= PASS_LIMIT ? `TOP ${PASS_LIMIT}` : `HORS TOP ${PASS_LIMIT}`;
+  return "2ᵉ MOITIÉ";
+}
+
+function sentence(stat, s) {
+  const r = s["rank_" + stat.field], t = tenth(r);
+  if (r === 1) return `Meilleure moyenne ${stat.subject} de la promo !`;
+  if (t <= (stat.field === "cycle" ? 6 : 5)) return `Parmi les ${t}0% meilleures moyennes ${stat.subject}.`;
+  if (stat.field !== "cycle") return `Dans la deuxième moitié des moyennes ${stat.subject}.`;
+  if (r <= PASS_LIMIT) return `Parmi les ${PASS_LIMIT} meilleures moyennes ${stat.subject}.`;
+  return `Parmi les ${TOTAL - PASS_LIMIT - 1} dernières moyennes ${stat.subject}.`;
+}
+
+// ---------------------------------------------------------------------------
+// Screens
+// ---------------------------------------------------------------------------
+
+async function intro() {
+  if (ANIMATE) clear();
+  print();
+
+  await play(t => {
+    const color = blend(["#111111", "#fbbf24"], ease(t));
+    return line(span("Au nom d'ALLAH", color, "i"), "c")
+      + line(span("le Tout Miséricordieux, le Très Miséricordieux", color, "i"), "c");
+  }, 1.0);
+  await pause(0.4);
+  print();
+
+  // Narrow screens get the title and the year on two lines each.
+  const narrow = panelWidth() < 49;
+  const title = narrow ? [spaced("MOYENNES"), spaced("CYCLE") + "   &   " + spaced("RANGS")]
+    : [spaced("MOYENNES CYCLE") + "   &   " + spaced("RANGS")];
+  const year = panelWidth() < 42 ? [...big("2014"), "", ...big("2015")] : big("2014-2015");
+  await play(t => {
+    const phase = 2 * ease(t);
+    return panel(
+      line(span(spaced("I.N.S.A.T") + "   ·   CH2", GREY[62]), "c")
+      + blank
+      + gradient(title, TITLE, phase, { wrap: true })
+      + blank
+      + gradient(year, TITLE, phase + 0.5, { cls: "big" })
+      + blank
+      + line(span("par Fares Khiary", GREY[58], "i"), "c"),
+      { border: "#7c3aed" });
+  }, 1.6);
+}
+
+function nameBanner(s) {
+  const full = [...`${s.prenom} ${s.nom}`];
+  return play(t => {
+    const shown = full.slice(0, Math.round(full.length * ease(t))).join("");
+    return panel(
+      gradient(spaced(shown.toUpperCase()) || " ", TITLE, 0, { wrap: true })
+      + line(span(`N° ${s.number}  ·  CH2 2014–2015`, GREY[58]), "c"),
+      { box: "heavy", border: GREY[35], pad: "pad02" });
+  }, 0.8);
+}
+
+// Two-row histogram of the class, the student's bar highlighted.
+function histogram(values, value, width, colors, t) {
+  const ordered = [...values].sort((a, b) => a - b);
+  const lo = ordered[Math.floor(ordered.length / 20)], hi = ordered[ordered.length - 1]; // ignore the extreme lows
+  const column = v => Math.max(0, Math.min(width - 1, Math.trunc((v - lo) / (hi - lo) * width)));
+
+  const counts = new Array(width).fill(0);
+  for (const v of values) counts[column(v)]++;
+  const peak = Math.max(...counts);
+  const blocks = " ▁▂▃▄▅▆▇█";
+  const mine = column(value);
+  const rows = ["", ""];
+  counts.forEach((n, col) => {
+    const level = n ? Math.max(1, Math.round(n / peak * 16)) : 0;
+    const [color, cls] = col === mine && t >= 1 ? ["#fff", "b"] : [blend(colors, col / width), "dim"];
+    rows[0] += span(blocks[Math.max(0, level - 8)], color, cls);
+    rows[1] += span(blocks[Math.min(8, level)], color, cls);
+  });
+  const marker = " ".repeat(Math.round(mine * ease(t))) + "▲";
+  const scale = lo.toFixed(0).padEnd(width - 2) + hi.toFixed(0);
+  return [`<div class="hist">${line(rows[0], "nw")}${line(rows[1], "nw")}${line(span(marker, "#fff", "b"), "nw")}${line(span(scale, GREY[42]), "nw")}</div>`, lo];
+}
+
+function card(stat, s, t) {
+  const values = students.map(x => x[stat.field]);
+  const value = s[stat.field], r = s["rank_" + stat.field];
+  const [chart, lo] = histogram(values, value, CARD_WIDTH - 4, stat.colors, t);
+
+  const e = ease(t);
+  const final = value.toFixed(stat.digits);
+  const shown = (lo + (value - lo) * e).toFixed(stat.digits).padStart(final.length);
+  const rankShown = TOTAL - Math.round((TOTAL - r) * e);
+  const medal = { 1: ["  ★", "#fde047", "b"], 2: ["  ✦", "#e5e7eb"], 3: ["  ✦", "#d97706"] }[rankShown];
+
+  const rank = span("RANG ", GREY[58]) + span(String(rankShown).padStart(2), "#fff", "b")
+    + span(` / ${TOTAL}`, GREY[58]) + (medal ? span(...medal) : "");
+  const chip = t >= 1
+    ? `<span class="chip" style="background:${stat.colors[0]}"> ${esc(bandLabel(r, stat.field))} </span>` : " ";
+  return panel(
+    line(span(stat.title, stat.colors[0], "b"))
+    + blank
+    + gradient(big(shown), stat.colors, 0, { cls: "big" })
+    + blank
+    + line(rank, "nw")
+    + blank
+    + chart
+    + blank
+    + line(chip),
+    { border: stat.colors[1], pad: "pad01", cls: "card" });
+}
+
+const cards = (s, t) => `<div class="cards">${STATS.map(stat => card(stat, s, t)).join("")}</div>`;
+
+function verdict(s) {
+  const r = s.rank_cycle;
+  const first = s.prenom.split(" ")[0];
+  let stops, border, title, lines;
+  if (r === 1) {
+    [stops, border] = [GOLD, "#f59e0b"];
+    title = "★  " + spaced("MAJOR DE PROMO") + "  ★";
+    lines = [`Félicitations ${first} ! Passage garanti, in sha'ALLAH.`];
+  } else if (r <= PASS_LIMIT) {
+    [stops, border] = [PASS, "#22c55e"];
+    title = "✔  " + spaced("PASSAGE GARANTI");
+    lines = [`Félicitations ${first} — in sha'ALLAH.`];
+  } else {
+    [stops, border] = [FAIL, "#ef4444"];
+    title = spaced("DÉSOLÉ") + "   " + first.toUpperCase();
+    lines = [];
+  }
+  lines.push(sentence(STATS[2], s));
+  const celebrate = r <= PASS_LIMIT;
+  const width = panelWidth();
+
+  return play(t => {
+    const frame = Math.floor(t * FPS * 2);
+    let html = "";
+    if (celebrate) html += sparkles(width - 6, frame, stops) + blank;
+    html += gradient(title, stops, ease(t) * 2, { wrap: true }) + blank;
+    html += lines.map((text, n) => line(span(text, n === 0 ? "#fff" : GREY[62]), "c")).join("");
+    if (celebrate) html += blank + sparkles(width - 6, frame + 1000, stops);
+    return panel(html, { box: "double", border });
+  }, celebrate ? 2.0 : 1.0);
+}
+
+async function showResults(s) {
+  if (ANIMATE) clear();
+  print();
+  print(`<div class="rule">${gradient("Moyennes Cycle & Rangs", TITLE)}</div>`);
+  print();
+  await nameBanner(s);
+  print();
+  await play(t => cards(s, t), 1.4);
+  print();
+  for (const stat of STATS) {
+    await pause(0.35);
+    print(line(span("  ● ", stat.colors[0]) + span(sentence(stat, s), GREY[85]), "bullet"));
+  }
+  print();
+  await suspense("Délibération du jury…", 1.8);
+  await verdict(s);
+}
+
+function showSpecial(s) {
+  print();
+  return play(t => panel(
+    gradient("Bonne chance pour l'année prochaine", SOFT, ease(t), { wrap: true })
+    + blank
+    + line(span(s.prenom, "#93c5fd", "b"), "c"),
+    { border: "#60a5fa" }), 1.2);
+}
+
+async function outro() {
+  print();
+  await play(t =>
+    line(span("Programme par", GREY[50]), "c")
+    + gradient(spaced("FARES KHIARY"), TITLE, 2 * ease(t))
+    + blank
+    + line(span("Peace ✌", "#fff", "b"), "c"), 1.4);
+  print();
+}
+
+// ---------------------------------------------------------------------------
+// Input
+// ---------------------------------------------------------------------------
+
+async function chooseStudent() {
+  const prompt = span("›", "#22d3ee", "b") + " " + span("Numéro ou nom", "#fff") + " "
+    + span(`(1–${TOTAL})`, GREY[50]) + " :&nbsp;";
+  while (true) {
+    const answer = await ask(prompt);
+    if (!answer) continue;
+    if (/^\d+$/.test(answer)) {
+      const n = Number(answer);
+      if (n >= 1 && n <= TOTAL) return students[n - 1];
+      print(line(span(`  Le numéro doit être entre 1 et ${TOTAL}.`, GREY[62])));
+      continue;
+    }
+    const query = normalize(answer);
+    const found = students.filter(s => normalize(`${s.prenom} ${s.nom}`).includes(query)
+      || normalize(`${s.nom} ${s.prenom}`).includes(query));
+    if (found.length === 1) return found[0];
+    if (!found.length) {
+      print(line(span(`  Aucun étudiant ne correspond à « ${answer} ».`, GREY[62])));
+      continue;
+    }
+    let rows = found.slice(0, 12).map(s =>
+      `<button type="button" class="match" data-n="${s.number}"><span class="n">${s.number}</span><span>${esc(fullName(s))}</span></button>`).join("");
+    if (found.length > 12) rows += line("  " + span("…", "#22d3ee") + " " + span(`${found.length - 12} autres`, GREY[50]));
+    print(`<div class="matches">${rows}</div>`);
+  }
+}
+
+async function again() {
+  while (true) {
+    const answer = await ask(span("Recommencer ?", "#fff") + " " + span("[o/n]", GREY[50]) + "&nbsp;",
+      [["Oui", "o"], ["Non", "n"]]);
+    const c = answer.slice(0, 1).toLowerCase();
+    if (c === "o" || c === "n") return c === "o";
+  }
+}
+
+async function main() {
+  setBusy(true);
+  await intro();
+  while (true) {
+    const s = await chooseStudent();
+    if (s.number === SPECIAL_NUMBER) await showSpecial(s);
+    else await showResults(s);
+    if (!(await again())) break;
+  }
+  await outro();
+  setBusy(false);
+  print(line(span("[Programme terminé]", GREY[42]), "c"));
+  const el = mount("c");
+  el.innerHTML = `<button type="button" class="restart">↻ Relancer</button>`;
+  el.firstChild.addEventListener("click", () => { clear(); main(); });
+  scrollEnd();
+}
+
+await document.fonts.ready;
+measure();
+main();
+</script>
+</body>
+</html>
